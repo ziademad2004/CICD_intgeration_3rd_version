@@ -77,7 +77,7 @@ jobs:
           build/test_*
         if-no-files-found: ignore
 
-  build-windows:
+   build-windows:
     name: Build and Test (Windows)
     runs-on: windows-latest
     
@@ -89,6 +89,11 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
       
+    - name: Setup Python for Qt installation
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
@@ -96,25 +101,34 @@ jobs:
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2019_64'
-        modules: 'qtbase qttools'
+        modules: 'qtbase qttools qttest'  # Added qttest module
+        cache: true
         setup-python: 'false'
+        tools: 'tools_cmake,qt.tools.cmake'
+        
+    - name: Verify Qt Installation
+      run: |
+        echo "Qt installation directory: ${{ env.Qt6_DIR }}"
+        dir "${{ env.Qt6_DIR }}" || echo "Qt6_DIR not set"
+        qmake -version || echo "qmake not found"
         
     - name: Create Build Directory
       run: mkdir build
       
     - name: Configure CMake
       working-directory: build
-      run: cmake .. -G "Visual Studio 17 2022" -A x64
-      
+      run: |
+        cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+        
     - name: Build
       working-directory: build
       run: cmake --build . --config Release
       
     - name: Run Tests
       working-directory: build
-      run: ctest -C Release --output-on-failure -V
-      env:
-        QT_QPA_PLATFORM: offscreen
+      run: |
+        $env:QT_QPA_PLATFORM = "offscreen"
+        ctest -C Release --output-on-failure -V
       
     - name: Upload Test Results
       uses: actions/upload-artifact@v4
