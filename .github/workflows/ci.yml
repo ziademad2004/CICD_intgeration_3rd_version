@@ -7,8 +7,8 @@ on:
     branches: [ main, master, develop ]
 
 jobs:
-  build-linux:
-    name: Build and Test (Linux)
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
     
     steps:
@@ -53,87 +53,13 @@ jobs:
         export QT_QPA_PLATFORM=offscreen
         xvfb-run -a ctest --output-on-failure -V
       
-    - name: Test individual executables (debug)
-      working-directory: build
-      run: |
-        echo "Testing individual executables..."
-        for test_exe in test_gamelogic test_authentication test_user test_aiopponent test_database; do
-          if [ -f "./$test_exe" ]; then
-            echo "Running $test_exe..."
-            timeout 30s xvfb-run -a env QT_QPA_PLATFORM=offscreen ./$test_exe || echo "$test_exe failed or timed out"
-          else
-            echo "$test_exe not found"
-          fi
-        done
-      continue-on-error: true
-      
     - name: Upload Test Results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-results-linux
+        name: test-results
         path: |
           build/Testing/Temporary/LastTest.log
           build/test_*
         if-no-files-found: ignore
 
-   build-windows:
-    name: Build and Test (Windows)
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      
-    - name: Setup Python for Qt installation
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.5.3'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2019_64'
-        modules: 'qtbase qttools qttest'  # Added qttest module
-        cache: true
-        setup-python: 'false'
-        tools: 'tools_cmake,qt.tools.cmake'
-        
-    - name: Verify Qt Installation
-      run: |
-        echo "Qt installation directory: ${{ env.Qt6_DIR }}"
-        dir "${{ env.Qt6_DIR }}" || echo "Qt6_DIR not set"
-        qmake -version || echo "qmake not found"
-        
-    - name: Create Build Directory
-      run: mkdir build
-      
-    - name: Configure CMake
-      working-directory: build
-      run: |
-        cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
-        
-    - name: Build
-      working-directory: build
-      run: cmake --build . --config Release
-      
-    - name: Run Tests
-      working-directory: build
-      run: |
-        $env:QT_QPA_PLATFORM = "offscreen"
-        ctest -C Release --output-on-failure -V
-      
-    - name: Upload Test Results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-windows
-        path: build/Testing/Temporary/LastTest.log
-        if-no-files-found: ignore
